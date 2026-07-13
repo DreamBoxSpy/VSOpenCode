@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable"
+              xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidVSOpenCodePackage">
+
+    <Groups>
+      <Group guid="guidOpenCodeCmdSet" id="grpOpenCodeWindow" priority="0x0000">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidOpenCodeCmdSet" id="cmdidShowOpenCodeWindow"
+              priority="0x0100" type="Button">
+        <Parent guid="guidOpenCodeCmdSet" id="grpOpenCodeWindow" />
+        <Strings>
+          <ButtonText>OpenCode</ButtonText>
+          <CommandName>OpenCode</CommandName>
+        </Strings>
+      </Button>
+    </Buttons>
+
+  </Commands>
+
+  <CommandPlacements>
+    <CommandPlacement guid="guidOpenCodeCmdSet" id="cmdidShowOpenCodeWindow" priority="0x0100">
+      <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+    </CommandPlacement>
+    <CommandPlacement guid="guidOpenCodeCmdSet" id="cmdidShowOpenCodeWindow" priority="0x0200">
+      <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_OTHER2" />
+    </CommandPlacement>
+  </CommandPlacements>
+
+  <Symbols>
+
+    <GuidSymbol name="guidVSOpenCodePackage" value="{B1C2D3E4-F5A6-7890-BCDE-F12345678901}" />
+
+    <GuidSymbol name="guidOpenCodeCmdSet" value="{C2D3E4F5-A6B7-8901-CDEF-123456789012}">
+      <IDSymbol name="grpOpenCodeWindow" value="0x1000" />
+      <IDSymbol name="cmdidShowOpenCodeWindow" value="0x0100" />
+    </GuidSymbol>
+
+  </Symbols>
+
+</CommandTable>
