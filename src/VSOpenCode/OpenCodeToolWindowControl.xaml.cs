@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using VSOpenCode.Commands;
 using VSOpenCode.Resources;
 using VSOpenCode.Services;
 
@@ -50,7 +51,8 @@ namespace VSOpenCode
         public OpenCodeToolWindowControl()
         {
             InitializeComponent();
-            _ = InitWebViewCoreAsync();
+            _ = InitWebViewCoreAsync()
+                .ContinueWith(_ => WaitServerAsync(), TaskScheduler.Current);
         }
 
         public void SetServiceProvider(IServiceProvider serviceProvider)
@@ -99,6 +101,16 @@ namespace VSOpenCode
             }
         }
 
+        private async Task WaitServerAsync()
+        {
+            await Task.Delay(500);
+            if(_serverController == null)
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                ShowOpenCodeWindowCommand.Instance.RefreshWindow();
+            }
+        }
+
         public async Task StartAsync()
         {
             if (_isStarting) return;
@@ -131,8 +143,6 @@ namespace VSOpenCode
         {
             _projRootTimer?.Dispose();
             _projRootTimer = null;
-            if (_serverController != null)
-                _serverController.Release(this);
         }
 
         private void OnServerConnectionLost()

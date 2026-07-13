@@ -18,9 +18,6 @@ namespace VSOpenCode.Services
         private string _currentProjectRoot;
         private string _currentSessionId;
 
-        private object _currentOwner;
-        private readonly object _ownerLock = new object();
-
         private CancellationTokenSource _shutdownCts;
         private CancellationTokenSource _workspaceCheckCts;
         private const int ShutdownIdleMinutes = 5;
@@ -49,38 +46,6 @@ namespace VSOpenCode.Services
         {
             _serverService = new OpenCodeServerService();
             _serverService.StateChanged += s => ServerStateChanged?.Invoke(s);
-        }
-
-        /// <summary>
-        /// Try to acquire ownership. Returns true if successful.
-        /// Fails if already owned by a different window.
-        /// </summary>
-        public bool TryAcquire(object owner)
-        {
-            lock (_ownerLock)
-            {
-                if (_currentOwner != null && _currentOwner != owner)
-                    return false;
-
-                _currentOwner = owner;
-                CancelShutdown();
-                return true;
-            }
-        }
-
-        /// <summary>
-        /// Release ownership. If no other owner, starts shutdown countdown.
-        /// </summary>
-        public void Release(object owner)
-        {
-            lock (_ownerLock)
-            {
-                if (_currentOwner != owner) return;
-                _currentOwner = null;
-            }
-
-            _connectionMonitor?.Stop();
-            StartShutdownCountdown();
         }
 
         /// <summary>
@@ -296,7 +261,6 @@ namespace VSOpenCode.Services
             if (_isDisposed) return;
             _isDisposed = true;
 
-            lock (_ownerLock) { _currentOwner = null; }
             Stop();
         }
     }

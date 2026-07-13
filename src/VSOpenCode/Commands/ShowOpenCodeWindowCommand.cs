@@ -32,6 +32,11 @@ namespace VSOpenCode.Commands
             Instance = new ShowOpenCodeWindowCommand((VSOpenCodePackage)package, commandService);
         }
 
+        public void RefreshWindow()
+        {
+            _  = _package.RefreshOpenCodeWindowAsync();
+        }
+
         private void Execute(object sender, EventArgs e)
         {
             _ = _package.JoinableTaskFactory.RunAsync(async delegate

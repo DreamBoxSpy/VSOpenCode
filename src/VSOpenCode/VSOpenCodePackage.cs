@@ -69,12 +69,6 @@ namespace VSOpenCode
                 toolWindow.SetServiceProvider(this);
                 toolWindow.Control.SetServerController(_serverController);
 
-                if (!_serverController.TryAcquire(toolWindow))
-                {
-                    // Another window already owns the controller — just show this one
-                    System.Diagnostics.Debug.WriteLine("Server controller owned by another window");
-                }
-
                 await toolWindow.Control.StartAsync();
             }
         }
@@ -87,7 +81,6 @@ namespace VSOpenCode
             if (window is OpenCodeToolWindow toolWindow && toolWindow?.Control != null)
             {
                 toolWindow.Control.SetServerController(_serverController);
-                _serverController.TryAcquire(toolWindow);
                 await toolWindow.Control.StartAsync();
             }
         }
