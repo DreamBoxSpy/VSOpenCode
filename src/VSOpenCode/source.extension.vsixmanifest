@@ -6,7 +6,7 @@
     <Description xml:space="preserve">Integrates OpenCode AI coding assistant into Visual Studio. Provides a WebView2 tool window to interact with OpenCode directly from the IDE.</Description>
     <Icon>Resources\Icon.png</Icon>
     <PreviewImage>Resources\Icon.png</PreviewImage>
-    <Tags>opencode;ai;coding;assistant;llm;webview2</Tags>
+    <Tags>ai;artificial intelligence;coding;assistant;llm;copilot;opencode;webview2;productivity</Tags>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">

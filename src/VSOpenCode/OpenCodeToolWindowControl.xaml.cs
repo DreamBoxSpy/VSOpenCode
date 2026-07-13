@@ -25,6 +25,7 @@ namespace VSOpenCode
         private bool _isDisposed;
         private bool _isStarting;
         private bool _retryDisabled;
+        private System.Threading.Timer _projRootTimer;
 
         private static readonly string ErrorPageTemplate;
         private static readonly string InjectProjectScript;
@@ -114,10 +115,10 @@ namespace VSOpenCode
 
         public void OnWindowClosing()
         {
+            _projRootTimer?.Dispose();
+            _projRootTimer = null;
             if (_serverController != null)
-            {
                 _serverController.Release(this);
-            }
         }
 
         private async Task StartFlowAsync()
@@ -162,6 +163,33 @@ namespace VSOpenCode
             {
                 NavigateToSession(sessionUrl, _currentProjectRoot);
             }
+
+            _projRootTimer?.Dispose();
+            _projRootTimer = new System.Threading.Timer(_ =>
+            {
+#pragma warning disable VSSDK007
+                _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+                {
+                    try
+                    {
+                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                        if (_projectRootResolver == null)
+                            _projectRootResolver = new ProjectRootResolver(_serviceProvider);
+                        var resolved = _projectRootResolver.ResolveProjectRoot();
+                        if (!string.Equals(resolved, _currentProjectRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"proj_root changed: {_currentProjectRoot} -> {resolved}");
+                            _currentProjectRoot = resolved;
+                            _serverController?.UpdateProjectRoot(resolved);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"proj_root timer: {ex.Message}");
+                    }
+                });
+#pragma warning restore VSSDK007
+            }, null, 5000, 5000);
         }
 
         private void NavigateToSession(string sessionUrl, string projectRoot)
@@ -261,6 +289,7 @@ namespace VSOpenCode
         {
             if (_isDisposed) return;
             _isDisposed = true;
+            _projRootTimer?.Dispose();
             webView?.Dispose();
         }
     }

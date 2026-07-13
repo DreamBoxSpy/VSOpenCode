@@ -22,8 +22,10 @@ namespace VSOpenCode.Services
         private readonly object _ownerLock = new object();
 
         private CancellationTokenSource _shutdownCts;
+        private CancellationTokenSource _workspaceCheckCts;
         private const int ShutdownIdleMinutes = 5;
         private const int AgentCheckIntervalMs = 10000;
+        private const int WorkspaceCheckIntervalMs = 5000;
         private bool _isDisposed;
 
         public IOpenCodeServerService ServerService => _serverService;
@@ -32,9 +34,16 @@ namespace VSOpenCode.Services
         public string CurrentSessionId => _currentSessionId;
         public string CurrentProjectRoot => _currentProjectRoot;
 
+        public void UpdateProjectRoot(string newRoot)
+        {
+            if (!string.Equals(newRoot, _currentProjectRoot, StringComparison.OrdinalIgnoreCase))
+                _currentProjectRoot = newRoot;
+        }
+
         public event Action<ConnectionState> ServerStateChanged;
         public event Action ConnectionLost;
         public event Action ConnectionRestored;
+        public event Action WorkspaceMismatch;
 
         public ServerController()
         {
@@ -128,6 +137,8 @@ namespace VSOpenCode.Services
             }
             _connectionMonitor.Start();
 
+            StartWorkspaceCheck();
+
             return true;
         }
 
@@ -151,6 +162,49 @@ namespace VSOpenCode.Services
             _connectionMonitor?.Dispose();
             _connectionMonitor = null;
             _serverService.Stop();
+        }
+
+        private void StartWorkspaceCheck()
+        {
+            _workspaceCheckCts?.Cancel();
+            _workspaceCheckCts = new CancellationTokenSource();
+            var ct = _workspaceCheckCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    await Task.Delay(WorkspaceCheckIntervalMs, ct);
+                    if (ct.IsCancellationRequested) return;
+
+                    if (_serverService.State != ConnectionState.Connected) continue;
+
+                    try
+                    {
+                        var pathInfo = await _sessionService.GetServerPathAsync();
+                        if (pathInfo == null) continue;
+
+                        var dir = ProjectRootResolver.NormalizePath(pathInfo.Directory ?? "");
+                        if (string.IsNullOrEmpty(dir)) continue;
+
+                        if (!string.Equals(dir, _currentProjectRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                $"Server directory changed: {_currentProjectRoot} -> {dir}");
+                            _currentProjectRoot = dir;
+                            WorkspaceMismatch?.Invoke();
+                        }
+                    }
+                    catch { }
+                }
+            });
+        }
+
+        private void CancelWorkspaceCheck()
+        {
+            _workspaceCheckCts?.Cancel();
+            _workspaceCheckCts?.Dispose();
+            _workspaceCheckCts = null;
         }
 
         private void StartShutdownCountdown()

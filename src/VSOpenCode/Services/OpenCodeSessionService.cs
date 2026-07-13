@@ -86,6 +86,21 @@ namespace VSOpenCode.Services
             return JsonConvert.DeserializeObject<PathInfo>(json);
         }
 
+        public async Task<PathInfo> GetServerPathAsync()
+        {
+            var client = _serverService.GetClient();
+            if (client == null)
+                throw new InvalidOperationException(StringsHelper.ErrorServerNotConnected);
+
+            var response = await client.GetAsync("/path");
+
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Failed to get server path: {response.StatusCode}");
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<PathInfo>(json);
+        }
+
         public async Task<List<ProjectInfo>> ListProjectsAsync(string directory)
         {
             var client = _serverService.GetClient();

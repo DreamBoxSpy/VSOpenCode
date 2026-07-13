@@ -24,6 +24,11 @@ namespace VSOpenCode.Services
         Task<Models.PathInfo> GetPathAsync(string directory);
 
         /// <summary>
+        /// Gets the server's current path info (without directory filter).
+        /// </summary>
+        Task<Models.PathInfo> GetServerPathAsync();
+
+        /// <summary>
         /// Lists all projects for the given directory.
         /// </summary>
         Task<List<Models.ProjectInfo>> ListProjectsAsync(string directory);

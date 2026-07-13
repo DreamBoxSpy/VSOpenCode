@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/vsix-publish",
+  "categories": [
+    "coding",
+    "visual studio extensions",
+    "other"
+  ],
+  "identity": {
+    "internalName": "VSOpenCode"
+  },
+  "overview": "README.md",
+  "priceCategory": "free",
+  "publisher": "HKLab",
+  "private": false,
+  "qna": true,
+  "repo": "https://github.com/DreamBoxSpy/VSOpenCode"
+}

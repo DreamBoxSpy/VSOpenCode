@@ -52,7 +52,10 @@ namespace VSOpenCode.Services
 
             try
             {
-                var dte = _serviceProvider?.GetService(typeof(DTE)) as DTE2;
+                var svc = _serviceProvider;
+
+                var dte = (svc?.GetService(typeof(DTE)) as DTE2) ??
+                    Package.GetGlobalService(typeof(DTE)) as DTE2;
                 if (dte?.Solution != null && !string.IsNullOrEmpty(dte.Solution.FullName))
                 {
                     return Path.GetDirectoryName(dte.Solution.FullName);
