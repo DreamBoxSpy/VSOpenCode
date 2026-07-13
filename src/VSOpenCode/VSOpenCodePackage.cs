@@ -47,13 +47,6 @@ namespace VSOpenCode
                 _solutionEvents = _dte.Events.SolutionEvents;
                 _solutionEvents.Opened += OnSolutionOpened;
             }
-
-            _ = JoinableTaskFactory.RunAsync(async () =>
-            {
-                await Task.Delay(3000, cancellationToken);
-                await JoinableTaskFactory.SwitchToMainThreadAsync();
-                await ShowOpenCodeWindowAsync();
-            });
         }
 
         private void OnSolutionOpened()
