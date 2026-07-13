@@ -49,5 +49,10 @@ namespace VSOpenCode.Services
         /// Raised when connection state changes.
         /// </summary>
         event System.Action<ConnectionState> StateChanged;
+
+        /// <summary>
+        /// Server password for WebView2 URL auth. Null if no auth.
+        /// </summary>
+        string ServerPassword { get; }
     }
 }

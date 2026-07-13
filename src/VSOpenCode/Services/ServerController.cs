@@ -141,7 +141,10 @@ namespace VSOpenCode.Services
 
             var osPath = (_currentProjectRoot ?? "").Replace('/', '\\');
             var b64 = ToUrlSafeBase64(osPath);
-            return $"{_serverService.ServerInfo.BaseUrl}/{b64}/session/{_currentSessionId}";
+            var host = $"{_serverService.ServerInfo.Host}:{_serverService.ServerInfo.Port}";
+            var pw = _serverService.ServerPassword;
+            var auth = !string.IsNullOrEmpty(pw) ? $"opencode:{pw}@" : "";
+            return $"http://{auth}{host}/{b64}/session/{_currentSessionId}";
         }
 
         public void Stop()

@@ -24,9 +24,11 @@ namespace VSOpenCode.Services
         private HttpClient _httpClient;
         private ServerInfo _serverInfo;
         private ConnectionState _state = ConnectionState.Disconnected;
+        private string _serverPassword;
 
         public ServerInfo ServerInfo => _serverInfo;
         public ConnectionState State => _state;
+        public string ServerPassword => _serverPassword;
         public event Action<ConnectionState> StateChanged;
 
         public HttpClient GetClient()
@@ -72,6 +74,7 @@ namespace VSOpenCode.Services
                     CreateNoWindow = true
                 };
                 psi.EnvironmentVariables["OPENCODE_SERVER_PASSWORD"] = serverPassword;
+                _serverPassword = serverPassword;
 
                 _process = System.Diagnostics.Process.Start(psi);
                 if (_process == null)
