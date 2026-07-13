@@ -100,6 +100,14 @@ namespace VSOpenCode
 
             try
             {
+                // Check server status before starting flow
+                if (webView.CoreWebView2 != null && _serverController != null)
+                {
+                    var isRunning = _serverController.State == ConnectionState.Connected;
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Tool window init: server running={isRunning}, proj={_currentProjectRoot}");
+                }
+
                 await StartFlowAsync();
             }
             catch (Exception ex)
@@ -127,9 +135,7 @@ namespace VSOpenCode
 
             // Resolve project root
             if (_projectRootResolver == null)
-            {
                 _projectRootResolver = new ProjectRootResolver(_serviceProvider);
-            }
             var newProjectRoot = _projectRootResolver.ResolveProjectRoot();
             System.Diagnostics.Debug.WriteLine($"Project root: {newProjectRoot} (current: {_currentProjectRoot})");
 
