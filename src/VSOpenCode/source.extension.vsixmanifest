@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PackageManifest Version="2.0.0"
-                 xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
-                 xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
-
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="VSOpenCode.a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-              Version="1.0.0"
-              Language="en-US"
-              Publisher="VSOpenCode" />
+    <Identity Id="VSOpenCode.hklab" Version="1.0.0" Language="en-US" Publisher="hklab" />
     <DisplayName>Visual Studio OpenCode</DisplayName>
     <Description xml:space="preserve">Integrates OpenCode AI coding assistant into Visual Studio. Provides a WebView2 tool window to interact with OpenCode directly from the IDE.</Description>
     <Icon>Resources\Icon.png</Icon>
     <PreviewImage>Resources\Icon.png</PreviewImage>
     <Tags>opencode;ai;coding;assistant;llm;webview2</Tags>
   </Metadata>
-
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">
       <ProductArchitecture>amd64</ProductArchitecture>
@@ -26,22 +19,11 @@
       <ProductArchitecture>amd64</ProductArchitecture>
     </InstallationTarget>
   </Installation>
-
   <Prerequisites>
-    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor"
-                  Version="[17.0,18.0)"
-                  DisplayName="Visual Studio core editor" />
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" DisplayName="Visual Studio core editor" Version="[17.0,18.0)" />
   </Prerequisites>
-
   <Assets>
-    <Asset Type="Microsoft.VisualStudio.VsPackage"
-           d:Source="Project"
-           d:ProjectName="%CurrentProject%"
-           Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
-    <Asset Type="Microsoft.VisualStudio.MefComponent"
-           d:Source="Project"
-           d:ProjectName="%CurrentProject%"
-           Path="|%CurrentProject%|" />
+    <Asset Type="Microsoft.VisualStudio.VsPackage" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" d:Source="Project" d:ProjectName="%CurrentProject%" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" Path="|%CurrentProject%|" d:Source="Project" d:ProjectName="%CurrentProject%" />
   </Assets>
-
 </PackageManifest>

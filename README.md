@@ -32,7 +32,7 @@ A Visual Studio extension that integrates [OpenCode](https://opencode.ai) into V
 ### Build
 
 ```bash
-msbuild src/VSOpenCode/VSOpenCode.csproj /p:Configuration=Release
+dotnet src/VSOpenCode/VSOpenCode.csproj /p:Configuration=Release
 ```
 
 ### Debug
