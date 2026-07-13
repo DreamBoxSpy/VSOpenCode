@@ -86,7 +86,13 @@ namespace VSOpenCode
 
             if (window is OpenCodeToolWindow toolWindow && toolWindow?.Control != null)
             {
+                toolWindow.Control.SetServerController(_serverController);
+                _serverController.TryAcquire(toolWindow);
                 await toolWindow.Control.StartAsync();
+            }
+            else
+            {
+                await ShowOpenCodeWindowAsync();
             }
         }
 
