@@ -124,6 +124,14 @@ namespace VSOpenCode.Services
             SetState(ConnectionState.Disconnected);
         }
 
+        public void UpdateConnectionState(bool connected)
+        {
+            if (connected)
+                SetState(ConnectionState.Connected);
+            else
+                SetState(ConnectionState.Disconnected);
+        }
+
         private static async Task<ServerInfo> ResolveServerUrlAsync(
             System.Diagnostics.Process process, int timeoutMs)
         {

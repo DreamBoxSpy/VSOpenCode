@@ -17,5 +17,7 @@ namespace VSOpenCode.Services
         System.Threading.Tasks.Task<bool> CheckHealthAsync();
         void Stop();
         event System.Action<ConnectionState> StateChanged;
+
+        void UpdateConnectionState(bool connected);
     }
 }

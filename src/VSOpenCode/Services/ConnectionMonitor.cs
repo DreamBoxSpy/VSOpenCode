@@ -56,17 +56,22 @@ namespace VSOpenCode.Services
                 var healthy = await _serverService.CheckHealthAsync();
                 IsConnected = healthy;
 
-                if (!healthy && wasConnected)
+                if (!healthy)
                 {
-                    ConnectionLost?.Invoke();
+                    _serverService.UpdateConnectionState(false);
+                    if (wasConnected)
+                        ConnectionLost?.Invoke();
                 }
-                else if (healthy && !wasConnected)
+                else
                 {
-                    ConnectionRestored?.Invoke();
+                    _serverService.UpdateConnectionState(true);
+                    if (!wasConnected)
+                        ConnectionRestored?.Invoke();
                 }
             }
             catch
             {
+                _serverService.UpdateConnectionState(false);
                 if (IsConnected)
                 {
                     IsConnected = false;

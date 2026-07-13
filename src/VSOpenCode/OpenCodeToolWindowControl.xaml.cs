@@ -25,6 +25,7 @@ namespace VSOpenCode
         private bool _isDisposed;
         private bool _isStarting;
         private bool _retryDisabled;
+        private bool _isShowingError;
         private System.Threading.Timer _projRootTimer;
 
         private static readonly string ErrorPageTemplate;
@@ -63,6 +64,11 @@ namespace VSOpenCode
         public void SetServerController(ServerController controller)
         {
             _serverController = controller;
+            if (_serverController != null)
+            {
+                _serverController.ConnectionLost += OnServerConnectionLost;
+                _serverController.ConnectionRestored += OnServerConnectionRestored;
+            }
         }
 
         private async Task InitWebViewCoreAsync()
@@ -129,6 +135,37 @@ namespace VSOpenCode
                 _serverController.Release(this);
         }
 
+        private void OnServerConnectionLost()
+        {
+            var state = _serverController?.State ?? ConnectionState.Disconnected;
+            System.Diagnostics.Debug.WriteLine($"Server connection lost! State: {state}");
+
+            _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                var msg = state switch
+                {
+                    ConnectionState.Error => "OpenCode server encountered an error.\n\nClick Retry to restart.",
+                    _ => StringsHelper.ErrorConnectionLost
+                };
+                await ShowErrorPageAsync(msg, true);
+            });
+        }
+
+        private void OnServerConnectionRestored()
+        {
+            System.Diagnostics.Debug.WriteLine("Server connection restored!");
+            _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                var url = _serverController?.GetSessionUrl();
+                if (url != null && webView.CoreWebView2 != null)
+                    webView.CoreWebView2.Navigate(url);
+                else
+                    await StartFlowAsync();
+            });
+        }
+
         private async Task StartFlowAsync()
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -173,11 +210,23 @@ namespace VSOpenCode
             _projRootTimer?.Dispose();
             _projRootTimer = new System.Threading.Timer(_ =>
             {
-#pragma warning disable VSSDK007
                 _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
                 {
                     try
                     {
+                        // Direct HTTP health check every 5s
+                        if (_serverController?.ServerService != null)
+                        {
+                            var healthy = await _serverController.ServerService.CheckHealthAsync();
+                            if (!healthy && _serverController.State != ConnectionState.Connecting
+                                && !_isStarting && !_isShowingError)
+                            {
+                                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                                await ShowErrorPageAsync(StringsHelper.ErrorConnectionLost, true);
+                                return;
+                            }
+                        }
+
                         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                         if (_projectRootResolver == null)
                             _projectRootResolver = new ProjectRootResolver(_serviceProvider);
@@ -191,15 +240,15 @@ namespace VSOpenCode
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"proj_root timer: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"timer: {ex.Message}");
                     }
                 });
-#pragma warning restore VSSDK007
             }, null, 5000, 5000);
         }
 
         private void NavigateToSession(string sessionUrl, string projectRoot)
         {
+            _isShowingError = false;
             if (webView.CoreWebView2 == null) return;
 
             System.Diagnostics.Debug.WriteLine($"Navigating to: {sessionUrl}");
@@ -232,6 +281,7 @@ namespace VSOpenCode
             if (message == "retry" && !_retryDisabled)
             {
                 _retryDisabled = true;
+                _isShowingError = false;
 #pragma warning disable VSSDK007
                 _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
                 {
