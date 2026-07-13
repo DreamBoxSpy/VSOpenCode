@@ -32,5 +32,7 @@ namespace VSOpenCode.Resources
 
         // UI Labels
         public static string UIRetry => GetString("UI.Retry");
+        public static string UILoading => GetString("UI.Loading");
+        public static string UIConnecting => GetString("UI.Connecting");
     }
 }

@@ -153,4 +153,10 @@
   <data name="UI.Starting" xml:space="preserve">
     <value>正在启动 OpenCode 服务器...</value>
   </data>
+  <data name="UI.Loading" xml:space="preserve">
+    <value>正在初始化...</value>
+  </data>
+  <data name="UI.Connecting" xml:space="preserve">
+    <value>正在连接 OpenCode 服务器...</value>
+  </data>
 </root>

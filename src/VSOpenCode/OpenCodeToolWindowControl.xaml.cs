@@ -30,12 +30,14 @@ namespace VSOpenCode
         private System.Threading.Timer _projRootTimer;
 
         private static readonly string ErrorPageTemplate;
+        private static readonly string LoadingPageTemplate;
         private static readonly string InjectProjectScript;
 
         static OpenCodeToolWindowControl()
         {
             var assembly = Assembly.GetExecutingAssembly();
             ErrorPageTemplate = LoadResourceString(assembly, "VSOpenCode.Resources.ErrorPage.html");
+            LoadingPageTemplate = LoadResourceString(assembly, "VSOpenCode.Resources.LoadingPage.html");
             InjectProjectScript = LoadResourceString(assembly, "VSOpenCode.Resources.InjectProject.js");
         }
 
@@ -92,6 +94,8 @@ namespace VSOpenCode
 
                 webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
                 webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+                await ShowLoadingPageAsync(StringsHelper.UILoading);
             }
             catch (Exception ex)
             {
@@ -178,6 +182,7 @@ namespace VSOpenCode
 
         private async Task StartFlowAsync()
         {
+            await ShowLoadingPageAsync(StringsHelper.UIConnecting);
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             // Resolve project root
@@ -309,9 +314,21 @@ namespace VSOpenCode
             }
         }
 
+        private async Task ShowLoadingPageAsync(string message)
+        {
+            var html = LoadingPageTemplate.Replace("{message}", message);
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            if (webView.CoreWebView2 != null)
+            {
+                webView.CoreWebView2.NavigateToString(html);
+            }
+        }
+
         private async Task ShowErrorPageAsync(string message, bool showRetry)
         {
-            var escapedMessage = System.Net.WebUtility.HtmlEncode(message).Replace("\n", "<br>");
+            var escapedMessage = System.Net.WebUtility.HtmlEncode(message)
+                .Replace("\n", "<br>")
+                .Replace("\\n", "<br>");
             var retryButton = showRetry
                 ? $@"<button id=""retryBtn"" onclick=""handleRetry()"">{StringsHelper.UIRetry}</button>"
                 : "";

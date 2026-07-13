@@ -153,4 +153,10 @@
   <data name="UI.Starting" xml:space="preserve">
     <value>Starting OpenCode server...</value>
   </data>
+  <data name="UI.Loading" xml:space="preserve">
+    <value>Initializing...</value>
+  </data>
+  <data name="UI.Connecting" xml:space="preserve">
+    <value>Connecting to OpenCode server...</value>
+  </data>
 </root>
