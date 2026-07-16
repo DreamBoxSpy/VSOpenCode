@@ -1,12 +1,20 @@
-using System;
-using System.IO;
-using System.Reflection;
-using System.Threading.Tasks;
-using System.Windows.Controls;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Controls;
 using VSOpenCode.Commands;
+using VSOpenCode.Models;
 using VSOpenCode.Resources;
 using VSOpenCode.Services;
 
@@ -14,13 +22,29 @@ namespace VSOpenCode
 {
     public partial class OpenCodeToolWindowControl : UserControl, IDisposable
     {
+        [ClassInterface(ClassInterfaceType.AutoDual)]
+        [ComVisible(true)]
+        public class WebView2HostBridge(
+            Func<string> getWorktree
+            )
+        {
+            public string GetWorktree()
+            {
+                return getWorktree();
+            }
+            public string GetWorktreeSHA()
+            {
+                
+                return BitConverter.ToString(SHA256.Create().ComputeHash(Encoding.UTF8.GetBytes(getWorktree()))).Replace("-", "");
+            }
+        }
+
         private IServiceProvider _serviceProvider;
 
         private CoreWebView2Environment _environment;
         private IProjectRootResolver _projectRootResolver;
         private ServerController _serverController;
 
-        private const string ErrorPageHost = "https://vscode-error.local/";
 
         private string _currentProjectRoot;
         private bool _isDisposed;
@@ -31,14 +55,14 @@ namespace VSOpenCode
 
         private static readonly string ErrorPageTemplate;
         private static readonly string LoadingPageTemplate;
-        private static readonly string InjectProjectScript;
+        private static readonly string InjectScript;
 
         static OpenCodeToolWindowControl()
         {
             var assembly = Assembly.GetExecutingAssembly();
             ErrorPageTemplate = LoadResourceString(assembly, "VSOpenCode.Resources.ErrorPage.html");
             LoadingPageTemplate = LoadResourceString(assembly, "VSOpenCode.Resources.LoadingPage.html");
-            InjectProjectScript = LoadResourceString(assembly, "VSOpenCode.Resources.InjectProject.js");
+            InjectScript = LoadResourceString(assembly, "VSOpenCode.Resources.Inject.js");
         }
 
         private static string LoadResourceString(Assembly assembly, string name)
@@ -75,6 +99,11 @@ namespace VSOpenCode
             }
         }
 
+        private void SetCurrentProjectRoot(string root)
+        {
+            _currentProjectRoot = root;
+        }
+
         private async Task InitWebViewCoreAsync()
         {
             try
@@ -92,16 +121,123 @@ namespace VSOpenCode
 
                 await webView.EnsureCoreWebView2Async(_environment);
 
-                webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
                 webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+                webView.CoreWebView2.ContentLoading += CoreWebView2_ContentLoading;
+               
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(InjectScript);
+
+                webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
+                webView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
 
                 await ShowLoadingPageAsync(StringsHelper.UILoading);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"WebView2 init failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"WebView2 init failed: {ex}");
                 await ShowErrorPageAsync(
-                    $"{StringsHelper.ErrorWebViewInitFailed}: {ex.Message}", false);
+                    $"{StringsHelper.ErrorWebViewInitFailed}: {ex}", false);
+            }
+        }
+
+        private void CoreWebView2_ContentLoading(object sender, CoreWebView2ContentLoadingEventArgs e)
+        {
+            webView.CoreWebView2.AddHostObjectToScript("vsoc", new WebView2HostBridge(
+                   () => _currentProjectRoot
+                   ));
+        }
+
+        private async void CoreWebView2_WebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+        {
+            var serverInfo = _serverController.ServerService.ServerInfo;
+            var deferral = e.GetDeferral();
+
+            try
+            {
+                var uri = new Uri(e.Request.Uri);
+
+                if (!uri.Host.EndsWith(".vsoc-app"))
+                {
+                    return;
+                }
+
+                var uriBuilder = new UriBuilder(e.Request.Uri)
+                {
+                    Host = serverInfo.Host,
+                    Port = serverInfo.Port,
+                };
+
+                var realUri = uriBuilder.Uri;
+
+                if(e.Request.Uri.ToString().EndsWith("/event"))
+                {
+                    //SSE
+                    e.Request.Uri = realUri.ToString();
+                    return;
+                }
+
+                Debug.WriteLine("[VSOC] Web Request: " + realUri);
+
+                var req = new HttpRequestMessage()
+                {
+                    RequestUri = realUri,
+                    Method = new(e.Request.Method),
+                };
+
+                if (e.Request.Content != null)
+                {
+                    req.Content = new StreamContent(e.Request.Content);
+                }
+
+                req.Headers.Clear();
+
+                foreach (var v in e.Request.Headers)
+                {
+                    req.Headers.TryAddWithoutValidation(v.Key, v.Value);
+                }
+
+                var client = _serverController.ServerService.GetClient();
+                var response = await client.SendAsync(req);
+
+                bool isSse = string.Equals(
+                    response.Content.Headers.ContentType?.MediaType,
+                    "text/event-stream",
+                    StringComparison.OrdinalIgnoreCase);
+
+                if(isSse)
+                {
+                    //SSE
+                    e.Request.Uri = realUri.ToString();
+                    return;
+                }
+
+                var cleanHeaders = new List<string>();
+                foreach (var header in response.Headers)
+                {
+                    if (header.Key.Equals("Content-Security-Policy", StringComparison.OrdinalIgnoreCase) ||
+                        header.Key.Equals("Content-Security-Policy-Report-Only", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    cleanHeaders.Add($"{header.Key}: {string.Join(",", header.Value)}");
+                }
+                foreach (var header in response.Content.Headers)
+                {
+                    if (header.Key.Equals("Content-Security-Policy", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    cleanHeaders.Add($"{header.Key}: {string.Join(",", header.Value)}");
+                }
+
+                Stream content = await response.Content.ReadAsStreamAsync();
+
+                e.Response = webView.CoreWebView2.Environment.CreateWebResourceResponse(
+                    content, (int)response.StatusCode, response.ReasonPhrase,
+                    string.Join("\n", cleanHeaders));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.ToString());
+            }
+            finally
+            {
+                deferral.Complete();
             }
         }
 
@@ -135,7 +271,7 @@ namespace VSOpenCode
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Start flow failed: {ex}");
-                await ShowErrorPageAsync($"Failed: {ex.Message}", true);
+                await ShowErrorPageAsync($"Failed: {ex}", true);
             }
             finally
             {
@@ -206,7 +342,7 @@ namespace VSOpenCode
                 }
             }
 
-            _currentProjectRoot = newProjectRoot;
+            SetCurrentProjectRoot(newProjectRoot);
 
             // Start server and get session
             var success = await _serverController.StartAsync(_currentProjectRoot);
@@ -249,13 +385,13 @@ namespace VSOpenCode
                         if (!string.Equals(resolved, _currentProjectRoot, StringComparison.OrdinalIgnoreCase))
                         {
                             System.Diagnostics.Debug.WriteLine($"proj_root changed: {_currentProjectRoot} -> {resolved}");
-                            _currentProjectRoot = resolved;
+                            SetCurrentProjectRoot(resolved);
                             _serverController?.UpdateProjectRoot(resolved);
                         }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"timer: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"timer: {ex}");
                     }
                 });
             }, null, 5000, 5000);
@@ -268,25 +404,6 @@ namespace VSOpenCode
 
             System.Diagnostics.Debug.WriteLine($"Navigating to: {sessionUrl}");
 
-            var osPath = projectRoot.Replace('/', '\\');
-            var injectOnce = false;
-            EventHandler<CoreWebView2NavigationCompletedEventArgs> onLoaded = null;
-            onLoaded = (s, args) =>
-            {
-                webView.CoreWebView2.NavigationCompleted -= onLoaded;
-                if (injectOnce || !args.IsSuccess) return;
-                injectOnce = true;
-
-#pragma warning disable VSSDK007
-                _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
-                {
-                    await InjectProjectIntoLocalStorageAsync(osPath);
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                    webView.CoreWebView2.Reload();
-                });
-#pragma warning restore VSSDK007
-            };
-            webView.CoreWebView2.NavigationCompleted += onLoaded;
             webView.CoreWebView2.Navigate(sessionUrl);
         }
 
@@ -345,26 +462,6 @@ namespace VSOpenCode
             if (webView.CoreWebView2 != null)
             {
                 webView.CoreWebView2.NavigateToString(html);
-            }
-        }
-
-        private void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs e)
-        {
-            if (e.Uri?.StartsWith(ErrorPageHost) == true) e.Cancel = true;
-        }
-
-        private async Task InjectProjectIntoLocalStorageAsync(string worktree)
-        {
-            if (webView?.CoreWebView2 == null) return;
-            try
-            {
-                var escaped = worktree.Replace("\\", "\\\\").Replace("'", "\\'");
-                var script = InjectProjectScript.Replace("{worktree}", escaped);
-                await webView.CoreWebView2.ExecuteScriptAsync(script);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Inject localStorage failed: {ex.Message}");
             }
         }
 

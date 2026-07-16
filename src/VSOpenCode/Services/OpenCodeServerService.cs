@@ -86,7 +86,7 @@ namespace VSOpenCode.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to start server: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Failed to start server: {ex}");
                 SetState(ConnectionState.Error);
                 return false;
             }

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
@@ -29,6 +29,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Inject.js" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectCapability Include="CreateVsixContainer" />
   </ItemGroup>
 
@@ -54,8 +58,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\ErrorPage.html" />
+    <EmbeddedResource Include="Resources\Inject.js" />
     <EmbeddedResource Include="Resources\LoadingPage.html" />
-    <EmbeddedResource Include="Resources\InjectProject.js" />
   </ItemGroup>
 
   <ItemGroup>

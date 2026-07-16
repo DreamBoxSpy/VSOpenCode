@@ -53,7 +53,7 @@ namespace VSOpenCode.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"ProcessBinding failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"ProcessBinding failed: {ex}");
             }
         }
 

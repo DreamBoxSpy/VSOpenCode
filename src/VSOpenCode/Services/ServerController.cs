@@ -1,4 +1,6 @@
 using System;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VSOpenCode.Models;
@@ -107,8 +109,10 @@ namespace VSOpenCode.Services
             return true;
         }
 
+
         /// <summary>
         /// Get navigation URL for current project/session.
+        /// Uses http://{proj_root_sha}.vsoc-app/... so WebView2 origin is tied to the project root.
         /// </summary>
         public string GetSessionUrl()
         {
@@ -117,8 +121,7 @@ namespace VSOpenCode.Services
 
             var osPath = (_currentProjectRoot ?? "").Replace('/', '\\');
             var b64 = ToUrlSafeBase64(osPath);
-            var host = $"{_serverService.ServerInfo.Host}:{_serverService.ServerInfo.Port}";
-            return $"http://{host}/{b64}/session/{_currentSessionId}";
+            return $"http://opencode.vsoc-app/{b64}/session/{_currentSessionId}";
         }
 
         public void Stop()
@@ -207,7 +210,7 @@ namespace VSOpenCode.Services
                 catch (OperationCanceledException) { }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"ServerController shutdown error: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"ServerController shutdown error: {ex}");
                 }
             });
         }
