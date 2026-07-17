@@ -367,3 +367,4 @@ FodyWeavers.xsd
 *.msp
 /.playwright-mcp
 *.png
+/.omo
