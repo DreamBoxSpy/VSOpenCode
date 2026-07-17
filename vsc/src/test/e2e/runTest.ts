@@ -31,6 +31,7 @@ async function main(): Promise<void> {
         "--skip-welcome",                // skip welcome page
         "--skip-release-notes",          // skip release notes
         "--disable-workspace-trust",     // skip workspace trust dialog
+        "--allow-localhost-loopback",    // allow localhost access in test env
         "--user-data-dir", path.resolve(__dirname, "../../../.vscode-test/user-data"),
       ],
     });

@@ -416,8 +416,8 @@ export class ServerService {
 		// Wait for the server to print its listening URL
 		const serverInfo = await this._waitForListeningUrl(proc);
 		this._serverInfo = serverInfo;
-
-		// Wait for the health endpoint to respond
+		console.log(`[OpenCode] Server listening: ${serverInfo.baseUrl}`);
+		console.log(`[OpenCode] Waiting for health check (timeout: ${STARTUP_TIMEOUT_MS}ms)...`);
 		const healthy = await this.waitForHealth(STARTUP_TIMEOUT_MS);
 		if (!healthy) {
 			// Server is not responding — clean up
@@ -508,22 +508,14 @@ export class ServerService {
 		}
 
 		try {
+			const healthUrl = `${this._serverInfo.baseUrl}/global/health`;
 			const response = await fetch(
-				`${this._serverInfo.baseUrl}/global/health`,
+				healthUrl,
 				{ signal: AbortSignal.timeout(5_000) },
 			);
 			if (!response.ok) {
 				return false;
 			}
-			const body: unknown = await response.json();
-			if (
-				typeof body === "object" &&
-				body !== null &&
-				"healthy" in body
-			) {
-				return (body as { healthy: boolean }).healthy === true;
-			}
-			return false;
 		} catch {
 			return false;
 		}

@@ -175,7 +175,9 @@ export class ExtensionController {
 		projectRoot: string,
 	): Promise<void> {
 		try {
+			console.log(`[OpenCode] _startServerFlow: starting server for ${projectRoot}`);
 			const result = await serverController.start(projectRoot);
+			console.log(`[OpenCode] _startServerFlow: server started, sessionUrl=${result.sessionUrl}`);
 			const sessionUrl = result.sessionUrl;
 
 			// Extract the upstream base URL (origin) from the session URL
@@ -189,9 +191,11 @@ export class ExtensionController {
 
 			// Start proxy with the upstream server URL
 			this.proxyServer = new ProxyServer(baseUrl);
+			console.log(`[OpenCode] _startServerFlow: starting proxy for ${baseUrl}`);
 			await this.proxyServer.start();
+			const proxyPort = new URL(this.proxyServer.getProxyUrl()).port;
 			console.log(
-				`[OpenCode] Proxy started on port: ${new URL(this.proxyServer.getProxyUrl()).port}`,
+				`[OpenCode] Proxy started on port: ${proxyPort}`,
 			);
 
 			// Navigate webview to the session (e.g. /session/abc123)

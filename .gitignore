@@ -368,3 +368,5 @@ FodyWeavers.xsd
 /.playwright-mcp
 *.png
 /.omo
+.vscode/
+.vscode-test/

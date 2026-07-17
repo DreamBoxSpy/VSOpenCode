@@ -120,8 +120,10 @@ export class ServerController {
 
 		// 4. Find existing session or create a new one
 		const normalizedRoot = normalizePath(projectRoot);
+		console.log(`[OpenCode] ServerController: listing sessions for ${projectRoot}`);
 		const sessions =
 			await this._sessionService.listSessions(projectRoot);
+		console.log(`[OpenCode] ServerController: found ${sessions.length} sessions`);
 		const existing = sessions.find(
 			(s) =>
 				s.directory &&

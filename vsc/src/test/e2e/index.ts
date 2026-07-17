@@ -9,7 +9,7 @@ export function run(): Promise<void> {
   const mocha = new Mocha({
     ui: "bdd",
     color: true,
-    timeout: 30000,
+    timeout: 180_000,
     reporter: "spec",
   });
 

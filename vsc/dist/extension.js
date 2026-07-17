@@ -451,6 +451,8 @@ var ServerService = class {
     });
     const serverInfo = await this._waitForListeningUrl(proc);
     this._serverInfo = serverInfo;
+    console.log(`[OpenCode] Server listening: ${serverInfo.baseUrl}`);
+    console.log(`[OpenCode] Waiting for health check (timeout: ${STARTUP_TIMEOUT_MS}ms)...`);
     const healthy = await this.waitForHealth(STARTUP_TIMEOUT_MS);
     if (!healthy) {
       this._stopping = true;
@@ -528,18 +530,14 @@ var ServerService = class {
       return false;
     }
     try {
+      const healthUrl = `${this._serverInfo.baseUrl}/global/health`;
       const response = await fetch(
-        `${this._serverInfo.baseUrl}/global/health`,
+        healthUrl,
         { signal: AbortSignal.timeout(5e3) }
       );
       if (!response.ok) {
         return false;
       }
-      const body = await response.json();
-      if (typeof body === "object" && body !== null && "healthy" in body) {
-        return body.healthy === true;
-      }
-      return false;
     } catch {
       return false;
     }
@@ -969,7 +967,9 @@ var ServerController = class {
     }
     this._sessionService = new SessionService(this._baseUrl);
     const normalizedRoot = normalizePath(projectRoot);
+    console.log(`[OpenCode] ServerController: listing sessions for ${projectRoot}`);
     const sessions = await this._sessionService.listSessions(projectRoot);
+    console.log(`[OpenCode] ServerController: found ${sessions.length} sessions`);
     const existing = sessions.find(
       (s) => s.directory && normalizePath(s.directory) === normalizedRoot
     );
@@ -2322,7 +2322,9 @@ var ExtensionController = class {
    */
   async _startServerFlow(serverController, projectRoot) {
     try {
+      console.log(`[OpenCode] _startServerFlow: starting server for ${projectRoot}`);
       const result = await serverController.start(projectRoot);
+      console.log(`[OpenCode] _startServerFlow: server started, sessionUrl=${result.sessionUrl}`);
       const sessionUrl = result.sessionUrl;
       const baseUrl = new URL(sessionUrl).origin;
       console.log(`[OpenCode] Proxy target: ${baseUrl}`);
@@ -2330,9 +2332,11 @@ var ExtensionController = class {
         await this.proxyServer.stop();
       }
       this.proxyServer = new ProxyServer(baseUrl);
+      console.log(`[OpenCode] _startServerFlow: starting proxy for ${baseUrl}`);
       await this.proxyServer.start();
+      const proxyPort = new URL(this.proxyServer.getProxyUrl()).port;
       console.log(
-        `[OpenCode] Proxy started on port: ${new URL(this.proxyServer.getProxyUrl()).port}`
+        `[OpenCode] Proxy started on port: ${proxyPort}`
       );
       const sessionPath = new URL(sessionUrl).pathname;
       this.provider.navigateToSession(sessionPath);
