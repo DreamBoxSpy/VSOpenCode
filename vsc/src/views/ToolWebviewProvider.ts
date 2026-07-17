@@ -33,6 +33,8 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	// -----------------------------------------------------------------------
 
 	private _view: vscode.WebviewView | null = null;
+	/** Error queued before resolveWebviewView() — flushed when the view becomes ready. */
+	private _pendingError: { message: string; canRetry: boolean } | null = null;
 	private readonly _extensionUri: vscode.Uri;
 	private readonly _getProxyUrl: () => string;
 
@@ -90,6 +92,13 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 				}
 			},
 		);
+
+		// If an error was queued before the view was ready, display it now.
+		if (this._pendingError) {
+			const { message, canRetry } = this._pendingError;
+			this._pendingError = null;
+			this._view.webview.html = getErrorPageHtml(message, canRetry);
+		}
 	}
 
 	// -----------------------------------------------------------------------
@@ -133,6 +142,8 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	 */
 	showError(message: string, canRetry: boolean): void {
 		if (!this._view) {
+			// View not ready yet — queue the error for resolveWebviewView()
+			this._pendingError = { message, canRetry };
 			return;
 		}
 		this._view.webview.html = getErrorPageHtml(message, canRetry);

@@ -236,6 +236,20 @@ var ServerService = class {
         timeout: 5e3
       });
       const lines = result.trim().split(/\r?\n/);
+      if (isWin) {
+        const extPattern = /\.(cmd|exe|bat)$/i;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && extPattern.test(trimmed)) {
+            return trimmed;
+          }
+        }
+        const first2 = lines[0]?.trim();
+        if (first2 && first2.length > 0) {
+          return `${first2}.cmd`;
+        }
+        return null;
+      }
       const first = lines[0]?.trim();
       return first && first.length > 0 ? first : null;
     } catch {
@@ -328,20 +342,33 @@ var ServerService = class {
     this._stopping = false;
     this._setState("connecting");
     const opencodePath = this.resolveOpenCodePath();
-    const proc = cp.spawn(opencodePath, ["serve"], {
+    console.log(`[OpenCode] Resolved binary: ${opencodePath}`);
+    console.log(`[OpenCode] Spawning: ${opencodePath} serve (cwd: ${projectRoot})`);
+    const spawnOpts = {
       cwd: projectRoot,
       detached: true,
-      stdio: "pipe"
-    });
+      stdio: "pipe",
+      windowsHide: true
+    };
+    if (process.platform === "win32") {
+      spawnOpts.shell = true;
+    }
+    const proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
     this._process = proc;
     ProcessRegistry.register(proc);
+    console.log(`[OpenCode] Process spawned, PID: ${proc.pid}`);
     proc.on("exit", (code, signal) => {
+      console.log(`[OpenCode] Process exited: code=${code}, signal=${signal}`);
       this._process = null;
       if (!this._stopping && this._state !== "disconnected") {
         this._setState("error");
       }
     });
-    proc.stderr?.on("data", (_chunk) => {
+    proc.stderr?.on("data", (chunk) => {
+      console.error(`[OpenCode] stderr: ${chunk.toString().trim()}`);
+    });
+    proc.stdout?.on("data", (chunk) => {
+      console.log(`[OpenCode] stdout: ${chunk.toString().trim()}`);
     });
     const serverInfo = await this._waitForListeningUrl(proc);
     this._serverInfo = serverInfo;
@@ -1543,6 +1570,8 @@ var ToolWebviewProvider = class {
   // Fields
   // -----------------------------------------------------------------------
   _view = null;
+  /** Error queued before resolveWebviewView() — flushed when the view becomes ready. */
+  _pendingError = null;
   _extensionUri;
   _getProxyUrl;
   _onDidRequestRetry = new vscode3.EventEmitter();
@@ -1585,6 +1614,11 @@ var ToolWebviewProvider = class {
         }
       }
     );
+    if (this._pendingError) {
+      const { message, canRetry } = this._pendingError;
+      this._pendingError = null;
+      this._view.webview.html = getErrorPageHtml(message, canRetry);
+    }
   }
   // -----------------------------------------------------------------------
   // Public navigation / display helpers
@@ -1622,6 +1656,7 @@ var ToolWebviewProvider = class {
    */
   showError(message, canRetry) {
     if (!this._view) {
+      this._pendingError = { message, canRetry };
       return;
     }
     this._view.webview.html = getErrorPageHtml(message, canRetry);

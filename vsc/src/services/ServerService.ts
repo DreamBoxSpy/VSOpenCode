@@ -145,6 +145,28 @@ export class ServerService {
 				timeout: 5_000,
 			});
 			const lines = result.trim().split(/\r?\n/);
+
+			if (isWin) {
+				// On Windows, `where` may return paths without extensions.
+				// child_process.spawn() cannot execute files without
+				// extensions on Windows, so prefer matches that already
+				// have a recognized extension.
+				const extPattern = /\.(cmd|exe|bat)$/i;
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (trimmed && extPattern.test(trimmed)) {
+						return trimmed;
+					}
+				}
+				// No match with extension — try appending .cmd to the
+				// first result as a last resort.
+				const first = lines[0]?.trim();
+				if (first && first.length > 0) {
+					return `${first}.cmd`;
+				}
+				return null;
+			}
+
 			const first = lines[0]?.trim();
 			return first && first.length > 0 ? first : null;
 		} catch {
@@ -256,18 +278,30 @@ export class ServerService {
 		this._setState("connecting");
 
 		const opencodePath = this.resolveOpenCodePath();
+		console.log(`[OpenCode] Resolved binary: ${opencodePath}`);
+		console.log(`[OpenCode] Spawning: ${opencodePath} serve (cwd: ${projectRoot})`);
 
-		const proc = cp.spawn(opencodePath, ["serve"], {
+		const spawnOpts: cp.SpawnOptions = {
 			cwd: projectRoot,
 			detached: true,
 			stdio: "pipe",
-		});
+			windowsHide: true,
+		};
+		// Belt-and-suspenders: on Windows, let the OS shell resolve
+		// extensions in case _shellLookup() returns a path without one.
+		if (process.platform === "win32") {
+			spawnOpts.shell = true;
+		}
+
+		const proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
 
 		this._process = proc;
 		ProcessRegistry.register(proc);
+		console.log(`[OpenCode] Process spawned, PID: ${proc.pid}`);
 
 		// Listen for unexpected exit
 		proc.on("exit", (code, signal) => {
+			console.log(`[OpenCode] Process exited: code=${code}, signal=${signal}`);
 			this._process = null;
 			if (!this._stopping && this._state !== "disconnected") {
 				this._setState("error");
@@ -275,8 +309,13 @@ export class ServerService {
 		});
 
 		// Listen for stderr (log it for debugging)
-		proc.stderr?.on("data", (_chunk: Buffer) => {
-			// stderr output is informational; errors are handled via exit event
+		proc.stderr?.on("data", (chunk: Buffer) => {
+			console.error(`[OpenCode] stderr: ${chunk.toString().trim()}`);
+		});
+
+		// Listen for stdout (raw)
+		proc.stdout?.on("data", (chunk: Buffer) => {
+			console.log(`[OpenCode] stdout: ${chunk.toString().trim()}`);
 		});
 
 		// Wait for the server to print its listening URL
