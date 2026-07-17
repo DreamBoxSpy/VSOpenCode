@@ -44,7 +44,9 @@ export class ExtensionController {
 		this.logger.info("OpenCode extension activating\u2026");
 
 		// 2. Register commands (focus sidebar, refresh, etc.)
-		registerCommands(this.context);
+		registerCommands(this.context, () => {
+			void this._startServerFlow(serverController, projectRoot);
+		});
 
 		// 3. Get ServerController singleton
 		const serverController = getServerController();
@@ -56,14 +58,13 @@ export class ExtensionController {
 		// 5–7. Create ToolWebviewProvider (proxy URL resolved lazily so
 		//      the provider can be constructed before the proxy is ready).
 		this.provider = new ToolWebviewProvider(
-			this.context.extensionUri,
 			() => this.proxyServer?.getProxyUrl() ?? "http://127.0.0.1:0",
 		);
 
 		// 8. Register WebviewViewProvider for the sidebar tool window
 		this.disposables.add(
 			vscode.window.registerWebviewViewProvider(
-				"vscode-opencode.toolWindow",
+				"vscode-opencode.toolView",
 				this.provider,
 			),
 		);
@@ -149,7 +150,6 @@ export class ExtensionController {
 		}
 
 		this.provider.dispose();
-		this.disposables.dispose();
 
 		this.logger.info("OpenCode extension deactivated.");
 	}

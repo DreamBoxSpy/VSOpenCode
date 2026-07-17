@@ -37,7 +37,6 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	private _pendingError: { message: string; canRetry: boolean } | null = null;
 	/** Session path queued before resolveWebviewView() — flushed when the view becomes ready. */
 	private _pendingSession: string | null = null;
-	private readonly _extensionUri: vscode.Uri;
 	private readonly _getProxyUrl: () => string;
 
 	private readonly _onDidRequestRetry = new vscode.EventEmitter<void>();
@@ -49,14 +48,11 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @param extensionUri The extension's root URI (for resolving bundled
-	 *   resources — currently unused but required for future template loading).
 	 * @param getProxyUrl A function that returns the local proxy server's
 	 *   origin (e.g. `http://127.0.0.1:15042`), typically sourced from
 	 *   {@link ProxyServer.getProxyUrl}.
 	 */
-	constructor(extensionUri: vscode.Uri, getProxyUrl: () => string) {
-		this._extensionUri = extensionUri;
+	constructor(getProxyUrl: () => string) {
 		this._getProxyUrl = getProxyUrl;
 	}
 
@@ -76,10 +72,11 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		console.log("[OpenCode] WebView resolved, showing loading...");
 		this._view = webviewView;
 
-		webviewView.webview.options = {
+		const opts: vscode.WebviewOptions & { retainContextWhenHidden?: boolean } = {
 			enableScripts: true,
 			retainContextWhenHidden: true,
-		} as vscode.WebviewOptions;
+		};
+		webviewView.webview.options = opts;
 
 		// Show the loading spinner until navigateToSession() is called.
 		this.showLoading("Starting OpenCode\u2026");

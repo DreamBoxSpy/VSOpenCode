@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
  * `context.subscriptions` so VS Code cleans them up automatically
  * when the extension is deactivated.
  */
-export function registerCommands(context: vscode.ExtensionContext): void {
+export function registerCommands(context: vscode.ExtensionContext, onRefresh?: () => void): void {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('vscode-opencode.openToolWindow', () => {
 			vscode.commands.executeCommand('workbench.view.extension.vscode-opencode');
@@ -17,8 +17,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('vscode-opencode.refreshToolWindow', () => {
-			// Placeholder — will be wired to ServerController in a later integration step.
-			vscode.window.showInformationMessage('Refreshing OpenCode...');
+			onRefresh?.();
 		}),
 	);
 }

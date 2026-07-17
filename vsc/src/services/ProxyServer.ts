@@ -1,6 +1,7 @@
 import * as http from "http";
 import type { Disposable } from "vscode";
 import { getProxyLoadingHtml } from "../views/templates";
+import { INJECT_SCRIPT } from "../views/inject";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -226,10 +227,9 @@ export class ProxyServer implements Disposable {
 	// Built-in routes
 	// -----------------------------------------------------------------------
 
-	/** Serve the placeholder inject script. */
+	/** Serve the inject script that hooks theme CSS, localStorage isolation, and project sidebar. */
 	private _serveInjectScript(res: http.ServerResponse): void {
-		const body =
-			"// OpenCode VS Code extension - inject script placeholder\n";
+		const body = INJECT_SCRIPT;
 		res.writeHead(200, {
 			"Content-Type": "application/javascript",
 			"Content-Length": Buffer.byteLength(body),
