@@ -83,11 +83,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "*",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^26.1.1",
     "@types/vscode": "*",
     "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "*",
     "esbuild": "*",
+    "mocha": "^11.7.6",
     "typescript": "^7.0.2"
   }
 }

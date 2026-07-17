@@ -1,19 +1,37 @@
 const esbuild = require("esbuild");
 const path = require("path");
-const glob = require("glob");
+const fs = require("fs");
 
 const isWatch = process.argv.includes("--watch");
 
 /**
- * esbuild configuration for integration test files.
- * Compiles test runner and all e2e test files to dist/test/.
+ * Recursively find all .ts files in a directory.
  */
-const testEntries =
-  glob.sync("src/test/e2e/**/*.ts", { cwd: __dirname });
+function findTsFiles(dir) {
+  const results = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...findTsFiles(fullPath));
+    } else if (entry.name.endsWith(".ts")) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+const e2eDir = path.resolve(__dirname, "src", "test", "e2e");
+const testEntries = fs.existsSync(e2eDir) ? findTsFiles(e2eDir) : [];
+
+if (testEntries.length === 0) {
+  console.log("[esbuild] No e2e test files found, skipping test build.");
+  process.exit(0);
+}
 
 /** @type {esbuild.BuildOptions} */
 const testConfig = {
-  entryPoints: testEntries.map((f) => path.resolve(__dirname, f)),
+  entryPoints: testEntries,
   bundle: true,
   platform: "node",
   target: "ES2022",
