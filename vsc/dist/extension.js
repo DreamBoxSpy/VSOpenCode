@@ -350,9 +350,6 @@ var ServerService = class {
       stdio: "pipe",
       windowsHide: true
     };
-    if (process.platform === "win32") {
-      spawnOpts.shell = true;
-    }
     const proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
     this._process = proc;
     ProcessRegistry.register(proc);

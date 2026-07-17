@@ -287,11 +287,6 @@ export class ServerService {
 			stdio: "pipe",
 			windowsHide: true,
 		};
-		// Belt-and-suspenders: on Windows, let the OS shell resolve
-		// extensions in case _shellLookup() returns a path without one.
-		if (process.platform === "win32") {
-			spawnOpts.shell = true;
-		}
 
 		const proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
 
