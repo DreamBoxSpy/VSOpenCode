@@ -76,12 +76,16 @@
     "compile": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "package": "vsce package --no-dependencies",
-    "lint": "biome check src/"
+    "lint": "biome check src/",
+    "test:unit": "node --experimental-strip-types --import ./src/test/unit/html-loader.mjs --test src/test/unit/**/*.test.ts",
+    "test:e2e": "node esbuild.test.config.js && node dist/test/runTest.js",
+    "test": "npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
     "@biomejs/biome": "*",
     "@types/node": "^26.1.1",
     "@types/vscode": "*",
+    "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "*",
     "esbuild": "*",
     "typescript": "^7.0.2"

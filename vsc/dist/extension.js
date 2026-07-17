@@ -684,12 +684,12 @@ function mapPath(raw) {
   };
 }
 var SessionServiceError = class extends Error {
+  status;
   constructor(message, status) {
     super(message);
-    this.status = status;
     this.name = "SessionServiceError";
+    this.status = status;
   }
-  status;
 };
 var SessionService = class {
   baseUrl;

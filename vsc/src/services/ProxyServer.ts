@@ -1,7 +1,7 @@
 import * as http from "http";
 import type { Disposable } from "vscode";
-import { getProxyLoadingHtml } from "../views/templates";
-import { INJECT_SCRIPT } from "../views/inject";
+import { getProxyLoadingHtml } from "../views/templates.ts";
+import { INJECT_SCRIPT } from "../views/inject.ts";
 
 // ---------------------------------------------------------------------------
 // Constants

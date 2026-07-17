@@ -187,12 +187,14 @@ function mapPath(raw: ServerPath): PathInfo {
 
 /** An error thrown when the HTTP response is an error status. */
 export class SessionServiceError extends Error {
+  public readonly status: number;
   constructor(
     message: string,
-    public readonly status: number,
+    status: number,
   ) {
     super(message);
     this.name = 'SessionServiceError';
+    this.status = status;
   }
 }
 
