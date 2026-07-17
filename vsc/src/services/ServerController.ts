@@ -286,11 +286,19 @@ export class ServerController {
 				const pathInfo: PathInfo =
 					await this._sessionService.getServerPath();
 				const serverDir = pathInfo.directory;
-				if (
-					serverDir &&
-					normalizePath(serverDir) !== this._projectRoot
-				) {
-					this.onWorkspaceMismatch?.();
+				if (serverDir) {
+					let serverPath = normalizePath(serverDir);
+					let projectRoot = this._projectRoot;
+					if (process.platform === 'win32') {
+						serverPath = serverPath.toLowerCase();
+						projectRoot = projectRoot.toLowerCase();
+					}
+					console.log(
+						`[OpenCode] Workspace check — server: ${serverPath}, project: ${projectRoot}`,
+					);
+					if (serverPath !== projectRoot) {
+						this.onWorkspaceMismatch?.();
+					}
 				}
 			} catch {
 				// Silently ignore — server may be temporarily unreachable

@@ -96,6 +96,9 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 
 		// If an error was queued before the view was ready, display it now.
 		if (this._pendingError) {
+			console.log(
+				`[OpenCode] Flushing pending error: ${this._pendingError.message}`,
+			);
 			const { message, canRetry } = this._pendingError;
 			this._pendingError = null;
 			this._view.webview.html = getErrorPageHtml(message, canRetry);
@@ -121,6 +124,8 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		const src = sessionUrl.startsWith("/")
 			? `${proxyUrl}${sessionUrl}`
 			: `${proxyUrl}/${sessionUrl}`;
+		console.log(`[OpenCode] Navigating to session path: ${sessionUrl}`);
+		console.log(`[OpenCode] Iframe src: ${src}`);
 		this._view.webview.html = getIframeHtml(src);
 	}
 

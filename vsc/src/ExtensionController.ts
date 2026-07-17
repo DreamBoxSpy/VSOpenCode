@@ -180,6 +180,7 @@ export class ExtensionController {
 
 			// Extract the upstream base URL (origin) from the session URL
 			const baseUrl = new URL(sessionUrl).origin;
+			console.log(`[OpenCode] Proxy target: ${baseUrl}`);
 
 			// Stop existing proxy if any (server may have moved ports)
 			if (this.proxyServer) {
@@ -189,6 +190,9 @@ export class ExtensionController {
 			// Start proxy with the upstream server URL
 			this.proxyServer = new ProxyServer(baseUrl);
 			await this.proxyServer.start();
+			console.log(
+				`[OpenCode] Proxy started on port: ${new URL(this.proxyServer.getProxyUrl()).port}`,
+			);
 
 			// Navigate webview to the session (e.g. /session/abc123)
 			const sessionPath = new URL(sessionUrl).pathname;

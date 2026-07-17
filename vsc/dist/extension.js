@@ -1100,8 +1100,19 @@ var ServerController = class {
         }
         const pathInfo = await this._sessionService.getServerPath();
         const serverDir = pathInfo.directory;
-        if (serverDir && normalizePath(serverDir) !== this._projectRoot) {
-          this.onWorkspaceMismatch?.();
+        if (serverDir) {
+          let serverPath = normalizePath(serverDir);
+          let projectRoot = this._projectRoot;
+          if (process.platform === "win32") {
+            serverPath = serverPath.toLowerCase();
+            projectRoot = projectRoot.toLowerCase();
+          }
+          console.log(
+            `[OpenCode] Workspace check \u2014 server: ${serverPath}, project: ${projectRoot}`
+          );
+          if (serverPath !== projectRoot) {
+            this.onWorkspaceMismatch?.();
+          }
         }
       } catch {
       }
@@ -1695,6 +1706,9 @@ var ToolWebviewProvider = class {
       }
     );
     if (this._pendingError) {
+      console.log(
+        `[OpenCode] Flushing pending error: ${this._pendingError.message}`
+      );
       const { message, canRetry } = this._pendingError;
       this._pendingError = null;
       this._view.webview.html = getErrorPageHtml(message, canRetry);
@@ -1716,6 +1730,8 @@ var ToolWebviewProvider = class {
     }
     const proxyUrl = this._getProxyUrl();
     const src = sessionUrl.startsWith("/") ? `${proxyUrl}${sessionUrl}` : `${proxyUrl}/${sessionUrl}`;
+    console.log(`[OpenCode] Navigating to session path: ${sessionUrl}`);
+    console.log(`[OpenCode] Iframe src: ${src}`);
     this._view.webview.html = getIframeHtml(src);
   }
   /**
@@ -1908,11 +1924,15 @@ var ExtensionController = class {
       const result = await serverController.start(projectRoot);
       const sessionUrl = result.sessionUrl;
       const baseUrl = new URL(sessionUrl).origin;
+      console.log(`[OpenCode] Proxy target: ${baseUrl}`);
       if (this.proxyServer) {
         await this.proxyServer.stop();
       }
       this.proxyServer = new ProxyServer(baseUrl);
       await this.proxyServer.start();
+      console.log(
+        `[OpenCode] Proxy started on port: ${new URL(this.proxyServer.getProxyUrl()).port}`
+      );
       const sessionPath = new URL(sessionUrl).pathname;
       this.provider.navigateToSession(sessionPath);
     } catch (err) {
