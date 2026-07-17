@@ -1,5 +1,6 @@
 import * as http from "http";
 import type { Disposable } from "vscode";
+import { getProxyLoadingHtml } from "../views/templates";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -238,34 +239,7 @@ export class ProxyServer implements Disposable {
 
 	/** Serve a minimal loading page with a CSS spinner. */
 	private _serveLoadingPage(res: http.ServerResponse): void {
-		const html =
-			"<!DOCTYPE html>\n" +
-			'<html lang="en">\n' +
-			"<head>\n" +
-			'<meta charset="UTF-8">\n' +
-			'<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
-			"<title>OpenCode</title>\n" +
-			"<style>\n" +
-			"  *{margin:0;padding:0;box-sizing:border-box}\n" +
-			"  body{display:flex;align-items:center;justify-content:center;min-height:100vh;" +
-			"background:var(--vscode-editor-background,#1e1e1e);" +
-			"color:var(--vscode-editor-foreground,#d4d4d4);" +
-			"font-family:var(--vscode-font-family,-apple-system,sans-serif)}\n" +
-			"  .spinner{width:40px;height:40px;border:3px solid var(--vscode-editorWidget-border,#3c3c3c);" +
-			"border-top-color:var(--vscode-focusBorder,#007acc);" +
-			"border-radius:50%;animation:spin .8s linear infinite}\n" +
-			"  @keyframes spin{to{transform:rotate(360deg)}}\n" +
-			"  .container{text-align:center}\n" +
-			"  .container p{margin-top:16px;font-size:14px;opacity:.8}\n" +
-			"</style>\n" +
-			"</head>\n" +
-			"<body>\n" +
-			'<div class="container">\n' +
-			'  <div class="spinner"></div>\n' +
-			"  <p>Loading OpenCode…</p>\n" +
-			"</div>\n" +
-			"</body>\n" +
-			"</html>\n";
+		const html = getProxyLoadingHtml();
 		res.writeHead(200, {
 			"Content-Type": "text/html; charset=utf-8",
 			"Content-Length": Buffer.byteLength(html),

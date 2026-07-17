@@ -13,6 +13,7 @@ const extensionConfig = {
   format: "cjs",
   outfile: path.resolve(__dirname, "dist", "extension.js"),
   external: ["vscode"],
+  loader: { ".html": "text" },
   minify: false,
   sourcemap: true,
 };

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { getLoadingPageHtml, getErrorPageHtml, getIframeHtml } from "./templates";
 
 // ---------------------------------------------------------------------------
 // ToolWebviewProvider
@@ -10,15 +11,14 @@ import * as vscode from "vscode";
  *
  * ## HTML lifecycle
  *
- * The webview cycles through three inline HTML pages:
+ * The webview cycles through three HTML pages sourced from
+ * {@link ./templates}:
  * 1. **Loading** — spinner + message (set during {@link resolveWebviewView}
  *    and via {@link showLoading}).
  * 2. **Iframe** — full-viewport iframe pointing at the local proxy server
  *    (set via {@link navigateToSession}).
  * 3. **Error** — error message with optional retry button (set via
  *    {@link showError}).
- *
- * Template extraction to separate files is deferred (see todo #13).
  *
  * ## Message protocol
  *
@@ -111,7 +111,7 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		const src = sessionUrl.startsWith("/")
 			? `${proxyUrl}${sessionUrl}`
 			: `${proxyUrl}/${sessionUrl}`;
-		this._view.webview.html = this._buildIframeHtml(src);
+		this._view.webview.html = getIframeHtml(src);
 	}
 
 	/**
@@ -121,7 +121,7 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		if (!this._view) {
 			return;
 		}
-		this._view.webview.html = this._buildLoadingHtml(message);
+		this._view.webview.html = getLoadingPageHtml(message);
 	}
 
 	/**
@@ -135,7 +135,7 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		if (!this._view) {
 			return;
 		}
-		this._view.webview.html = this._buildErrorHtml(message, canRetry);
+		this._view.webview.html = getErrorPageHtml(message, canRetry);
 	}
 
 	/**
@@ -159,161 +159,5 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	dispose(): void {
 		this._onDidRequestRetry.dispose();
 		this._view = null;
-	}
-
-	// -----------------------------------------------------------------------
-	// HTML builders (inline — templates will be extracted in todo #13)
-	// -----------------------------------------------------------------------
-
-	/**
-	 * Full-viewport iframe that loads the session through the proxy.
-	 * Posts a `{ type: 'ready' }` message when the iframe finishes loading.
-	 */
-	private _buildIframeHtml(src: string): string {
-		return [
-			"<!DOCTYPE html>",
-			'<html lang="en">',
-			"<head>",
-			'<meta charset="UTF-8">',
-			'<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-			"<title>OpenCode</title>",
-			"<style>",
-			"  *{margin:0;padding:0;box-sizing:border-box}",
-			"  html,body{width:100%;height:100%;overflow:hidden;",
-			"background:var(--vscode-editor-background,#1e1e1e)}",
-			"  iframe{width:100%;height:100%;border:none}",
-			"</style>",
-			"</head>",
-			"<body>",
-			`<iframe src="${this._escapeAttr(src)}"></iframe>`,
-			"<script>",
-			"  const vscode = acquireVsCodeApi();",
-			"  const iframe = document.querySelector('iframe');",
-			"  iframe.addEventListener('load', () => {",
-			"    vscode.postMessage({ type: 'ready' });",
-			"  });",
-			"</script>",
-			"</body>",
-			"</html>",
-		].join("\n");
-	}
-
-	/**
-	 * Centered CSS spinner with a message underneath.
-	 */
-	private _buildLoadingHtml(message: string): string {
-		return [
-			"<!DOCTYPE html>",
-			'<html lang="en">',
-			"<head>",
-			'<meta charset="UTF-8">',
-			'<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-			"<title>OpenCode</title>",
-			"<style>",
-			"  *{margin:0;padding:0;box-sizing:border-box}",
-			"  body{display:flex;align-items:center;justify-content:center;",
-			"min-height:100vh;",
-			"background:var(--vscode-editor-background,#1e1e1e);",
-			"color:var(--vscode-editor-foreground,#d4d4d4);",
-			"font-family:var(--vscode-font-family,-apple-system,sans-serif)}",
-			"  .spinner{width:40px;height:40px;",
-			"border:3px solid var(--vscode-editorWidget-border,#3c3c3c);",
-			"border-top-color:var(--vscode-focusBorder,#007acc);",
-			"border-radius:50%;animation:spin .8s linear infinite}",
-			"  @keyframes spin{to{transform:rotate(360deg)}}",
-			"  .container{text-align:center}",
-			"  .container p{margin-top:16px;font-size:14px;opacity:.8}",
-			"</style>",
-			"</head>",
-			"<body>",
-			'<div class="container">',
-			'  <div class="spinner"></div>',
-			`  <p>${this._escapeHtml(message)}</p>`,
-			"</div>",
-			"</body>",
-			"</html>",
-		].join("\n");
-	}
-
-	/**
-	 * Error display with an optional retry button.
-	 * Posts a `{ type: 'retry' }` message when the button is clicked.
-	 */
-	private _buildErrorHtml(message: string, canRetry: boolean): string {
-		const retryButton = canRetry
-			? '<button id="retry-btn">Retry</button>'
-			: "";
-
-		return [
-			"<!DOCTYPE html>",
-			'<html lang="en">',
-			"<head>",
-			'<meta charset="UTF-8">',
-			'<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-			"<title>OpenCode — Error</title>",
-			"<style>",
-			"  *{margin:0;padding:0;box-sizing:border-box}",
-			"  body{display:flex;align-items:center;justify-content:center;",
-			"min-height:100vh;",
-			"background:var(--vscode-editor-background,#1e1e1e);",
-			"color:var(--vscode-editor-foreground,#d4d4d4);",
-			"font-family:var(--vscode-font-family,-apple-system,sans-serif)}",
-			"  .container{text-align:center;max-width:320px;padding:24px}",
-			"  .error-icon{font-size:48px;line-height:1;margin-bottom:16px}",
-			"  .container p{margin-bottom:24px;font-size:14px;",
-			"line-height:1.5;opacity:.85;word-wrap:break-word}",
-			"  button{background:var(--vscode-button-background,#007acc);",
-			"color:var(--vscode-button-foreground,#fff);",
-			"border:none;padding:8px 24px;font-size:13px;",
-			"border-radius:2px;cursor:pointer}",
-			"  button:hover{background:var(--vscode-button-hoverBackground,#1c97e8)}",
-			"</style>",
-			"</head>",
-			"<body>",
-			'<div class="container">',
-			'  <div class="error-icon">\u26A0\uFE0F</div>',
-			`  <p>${this._escapeHtml(message)}</p>`,
-			`  ${retryButton}`,
-			"</div>",
-			canRetry
-				? [
-						"<script>",
-						"  const vscode = acquireVsCodeApi();",
-						"  document.getElementById('retry-btn').addEventListener('click', () => {",
-						"    vscode.postMessage({ type: 'retry' });",
-						"  });",
-						"</script>",
-					].join("\n")
-				: "",
-			"</body>",
-			"</html>",
-		].join("\n");
-	}
-
-	// -----------------------------------------------------------------------
-	// Escaping helpers
-	// -----------------------------------------------------------------------
-
-	/**
-	 * Escape a string for safe inclusion in HTML text content.
-	 */
-	private _escapeHtml(text: string): string {
-		return text
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/"/g, "&quot;");
-	}
-
-	/**
-	 * Escape a string for safe inclusion in an HTML attribute value
-	 * (double-quoted).
-	 */
-	private _escapeAttr(value: string): string {
-		return value
-			.replace(/&/g, "&amp;")
-			.replace(/"/g, "&quot;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;");
 	}
 }
