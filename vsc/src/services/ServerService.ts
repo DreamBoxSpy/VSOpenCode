@@ -277,8 +277,36 @@ export class ServerService {
 		this._stopping = false;
 		this._setState("connecting");
 
-		const opencodePath = this.resolveOpenCodePath();
+		let opencodePath = this.resolveOpenCodePath();
+
+		// Hex dump each character to help diagnose hidden/unprintable chars
+		const hexDump = [...opencodePath]
+			.map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
+			.join(" ");
 		console.log(`[OpenCode] Resolved binary: ${opencodePath}`);
+		console.log(`[OpenCode] Resolved binary hex: ${hexDump}`);
+
+		// Validate the resolved path exists on disk
+		if (!fs.existsSync(opencodePath)) {
+			// On Windows with no extension, try .cmd as final fallback
+			if (process.platform === "win32" && !path.extname(opencodePath)) {
+				const withCmd = `${opencodePath}.cmd`;
+				console.log(`[OpenCode] Path not found, trying .cmd fallback: ${withCmd}`);
+				if (fs.existsSync(withCmd)) {
+					console.log(`[OpenCode] Using .cmd fallback: ${withCmd}`);
+					opencodePath = withCmd;
+				}
+			}
+		}
+
+		if (!fs.existsSync(opencodePath)) {
+			throw new Error(
+				`OpenCode executable not found at: ${opencodePath}. ` +
+					"Set 'vscode-opencode.opencodePath' in your VS Code settings, " +
+					"or ensure opencode is on your PATH.",
+			);
+		}
+
 		console.log(`[OpenCode] Spawning: ${opencodePath} serve (cwd: ${projectRoot})`);
 
 		const spawnOpts: cp.SpawnOptions = {
@@ -288,7 +316,20 @@ export class ServerService {
 			windowsHide: true,
 		};
 
-		const proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
+		let proc: ChildProcess;
+		try {
+			proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : String(err);
+			console.error(`[OpenCode] spawn failed: ${msg}`);
+			console.error(`[OpenCode] spawn path: ${opencodePath}`);
+			console.error(`[OpenCode] spawn path hex: ${hexDump}`);
+			throw new Error(
+				`Failed to spawn opencode process: ${msg}. ` +
+					`Path: ${opencodePath}. ` +
+					"Verify that the path points to a valid executable.",
+			);
+		}
 
 		this._process = proc;
 		ProcessRegistry.register(proc);

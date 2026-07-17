@@ -341,8 +341,25 @@ var ServerService = class {
     }
     this._stopping = false;
     this._setState("connecting");
-    const opencodePath = this.resolveOpenCodePath();
+    let opencodePath = this.resolveOpenCodePath();
+    const hexDump = [...opencodePath].map((c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join(" ");
     console.log(`[OpenCode] Resolved binary: ${opencodePath}`);
+    console.log(`[OpenCode] Resolved binary hex: ${hexDump}`);
+    if (!fs.existsSync(opencodePath)) {
+      if (process.platform === "win32" && !path.extname(opencodePath)) {
+        const withCmd = `${opencodePath}.cmd`;
+        console.log(`[OpenCode] Path not found, trying .cmd fallback: ${withCmd}`);
+        if (fs.existsSync(withCmd)) {
+          console.log(`[OpenCode] Using .cmd fallback: ${withCmd}`);
+          opencodePath = withCmd;
+        }
+      }
+    }
+    if (!fs.existsSync(opencodePath)) {
+      throw new Error(
+        `OpenCode executable not found at: ${opencodePath}. Set 'vscode-opencode.opencodePath' in your VS Code settings, or ensure opencode is on your PATH.`
+      );
+    }
     console.log(`[OpenCode] Spawning: ${opencodePath} serve (cwd: ${projectRoot})`);
     const spawnOpts = {
       cwd: projectRoot,
@@ -350,7 +367,18 @@ var ServerService = class {
       stdio: "pipe",
       windowsHide: true
     };
-    const proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
+    let proc;
+    try {
+      proc = cp.spawn(opencodePath, ["serve"], spawnOpts);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[OpenCode] spawn failed: ${msg}`);
+      console.error(`[OpenCode] spawn path: ${opencodePath}`);
+      console.error(`[OpenCode] spawn path hex: ${hexDump}`);
+      throw new Error(
+        `Failed to spawn opencode process: ${msg}. Path: ${opencodePath}. Verify that the path points to a valid executable.`
+      );
+    }
     this._process = proc;
     ProcessRegistry.register(proc);
     console.log(`[OpenCode] Process spawned, PID: ${proc.pid}`);
@@ -1596,6 +1624,7 @@ var ToolWebviewProvider = class {
    * recreated after being hidden.
    */
   resolveWebviewView(webviewView, _context, _token) {
+    console.log("[OpenCode] WebView resolved, showing loading...");
     this._view = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
@@ -1642,7 +1671,9 @@ var ToolWebviewProvider = class {
     if (!this._view) {
       return;
     }
-    this._view.webview.html = getLoadingPageHtml(message);
+    const html = getLoadingPageHtml(message);
+    console.log(`[OpenCode] Loading HTML length: ${html.length}`);
+    this._view.webview.html = html;
   }
   /**
    * Show an error display.

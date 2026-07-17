@@ -71,6 +71,7 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		_context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken,
 	): void {
+		console.log("[OpenCode] WebView resolved, showing loading...");
 		this._view = webviewView;
 
 		webviewView.webview.options = {
@@ -130,7 +131,9 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 		if (!this._view) {
 			return;
 		}
-		this._view.webview.html = getLoadingPageHtml(message);
+		const html = getLoadingPageHtml(message);
+		console.log(`[OpenCode] Loading HTML length: ${html.length}`);
+		this._view.webview.html = html;
 	}
 
 	/**
