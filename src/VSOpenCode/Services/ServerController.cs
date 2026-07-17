@@ -105,6 +105,7 @@ namespace VSOpenCode.Services
             _connectionMonitor.Start();
 
             StartWorkspaceCheck();
+            StartShutdownCountdown();
 
             return true;
         }
@@ -126,6 +127,7 @@ namespace VSOpenCode.Services
 
         public void Stop()
         {
+            CancelWorkspaceCheck();
             CancelShutdown();
             _connectionMonitor?.Dispose();
             _connectionMonitor = null;
