@@ -1662,6 +1662,8 @@ var ToolWebviewProvider = class {
   _view = null;
   /** Error queued before resolveWebviewView() — flushed when the view becomes ready. */
   _pendingError = null;
+  /** Session path queued before resolveWebviewView() — flushed when the view becomes ready. */
+  _pendingSession = null;
   _extensionUri;
   _getProxyUrl;
   _onDidRequestRetry = new vscode3.EventEmitter();
@@ -1713,6 +1715,13 @@ var ToolWebviewProvider = class {
       this._pendingError = null;
       this._view.webview.html = getErrorPageHtml(message, canRetry);
     }
+    if (this._pendingSession) {
+      console.log(
+        `[OpenCode] Flushing pending session: ${this._pendingSession}`
+      );
+      this.navigateToSession(this._pendingSession);
+      this._pendingSession = null;
+    }
   }
   // -----------------------------------------------------------------------
   // Public navigation / display helpers
@@ -1726,6 +1735,8 @@ var ToolWebviewProvider = class {
    */
   navigateToSession(sessionUrl) {
     if (!this._view) {
+      this._pendingSession = sessionUrl;
+      console.log(`[OpenCode] Session path queued (view not ready): ${sessionUrl}`);
       return;
     }
     const proxyUrl = this._getProxyUrl();

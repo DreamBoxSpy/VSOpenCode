@@ -35,6 +35,8 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	private _view: vscode.WebviewView | null = null;
 	/** Error queued before resolveWebviewView() — flushed when the view becomes ready. */
 	private _pendingError: { message: string; canRetry: boolean } | null = null;
+	/** Session path queued before resolveWebviewView() — flushed when the view becomes ready. */
+	private _pendingSession: string | null = null;
 	private readonly _extensionUri: vscode.Uri;
 	private readonly _getProxyUrl: () => string;
 
@@ -103,6 +105,15 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 			this._pendingError = null;
 			this._view.webview.html = getErrorPageHtml(message, canRetry);
 		}
+
+		// If a session path was queued before the view was ready, navigate now.
+		if (this._pendingSession) {
+			console.log(
+				`[OpenCode] Flushing pending session: ${this._pendingSession}`,
+			);
+			this.navigateToSession(this._pendingSession);
+			this._pendingSession = null;
+		}
 	}
 
 	// -----------------------------------------------------------------------
@@ -118,6 +129,8 @@ export class ToolWebviewProvider implements vscode.WebviewViewProvider {
 	 */
 	navigateToSession(sessionUrl: string): void {
 		if (!this._view) {
+			this._pendingSession = sessionUrl;
+			console.log(`[OpenCode] Session path queued (view not ready): ${sessionUrl}`);
 			return;
 		}
 		const proxyUrl = this._getProxyUrl();
