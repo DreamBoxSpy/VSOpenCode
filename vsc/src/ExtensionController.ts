@@ -1,21 +1,13 @@
-import * as vscode from 'vscode';
-import { DisposableStore } from './utils/DisposableStore';
-import { Logger } from './utils/Logger';
-
-// ---------------------------------------------------------------------------
-// Service container — plain object, no DI framework needed.
-// Services are added in later waves as they are built.
-// ---------------------------------------------------------------------------
-
-interface ServiceContainer {
-	logger: Logger;
-	// TODO (Wave 2): Add ServerService
-	// TODO (Wave 2): Add SessionService
-	// TODO (Wave 2): Add ProjectRootResolver
-	// TODO (Wave 2): Add ConnectionMonitor
-	// TODO (Wave 2): Add ServerController (orchestrator)
-	// TODO (Wave 2): Add ProxyServer (local HTTP proxy)
-}
+import * as vscode from "vscode";
+import { DisposableStore } from "./utils/DisposableStore";
+import { Logger } from "./utils/Logger";
+import { getServerController } from "./services/ServerController";
+import type { ServerController } from "./services/ServerController";
+import { ProxyServer } from "./services/ProxyServer";
+import { ProjectRootResolver } from "./services/ProjectRootResolver";
+import { ToolWebviewProvider } from "./views/ToolWebviewProvider";
+import { setupThemeSync } from "./theme";
+import { registerCommands } from "./commands/registerCommands";
 
 // ---------------------------------------------------------------------------
 // ExtensionController
@@ -33,7 +25,8 @@ export class ExtensionController {
 	private readonly disposables = new DisposableStore();
 
 	private logger!: Logger;
-	private services!: ServiceContainer;
+	private provider!: ToolWebviewProvider;
+	private proxyServer: ProxyServer | null = null;
 
 	constructor(context: vscode.ExtensionContext) {
 		this.context = context;
@@ -45,38 +38,92 @@ export class ExtensionController {
 
 	/** Wire everything up. Called once by `extension.activate()`. */
 	activate(): void {
-		// (a) Create Logger — every service logs through it
+		// 1. Create Logger — every service logs through it
 		this.logger = new Logger();
 		this.disposables.add(this.logger);
-		this.logger.info('OpenCode extension activating…');
+		this.logger.info("OpenCode extension activating\u2026");
 
-		// (b) Build service container (plain object — services added later)
-		this.services = {
-			logger: this.logger,
-			// TODO (Wave 2): new ServerService(config, logger)
-			// TODO (Wave 2): new SessionService(serverService, logger)
-			// TODO (Wave 2): new ProjectRootResolver()
-			// TODO (Wave 2): new ConnectionMonitor(serverService)
-			// TODO (Wave 2): new ServerController(serverService, sessionService, ...)
-			// TODO (Wave 2): new ProxyServer(serverController, logger)
+		// 2. Register commands (focus sidebar, refresh, etc.)
+		registerCommands(this.context);
+
+		// 3. Get ServerController singleton
+		const serverController = getServerController();
+
+		// 4. Create ProjectRootResolver, resolve project root
+		const rootResolver = new ProjectRootResolver();
+		let projectRoot = rootResolver.resolve();
+
+		// 5–7. Create ToolWebviewProvider (proxy URL resolved lazily so
+		//      the provider can be constructed before the proxy is ready).
+		this.provider = new ToolWebviewProvider(
+			this.context.extensionUri,
+			() => this.proxyServer?.getProxyUrl() ?? "http://127.0.0.1:0",
+		);
+
+		// 8. Register WebviewViewProvider for the sidebar tool window
+		this.disposables.add(
+			vscode.window.registerWebviewViewProvider(
+				"vscode-opencode.toolWindow",
+				this.provider,
+			),
+		);
+
+		// 9. Set up theme sync — posts theme changes into the webview
+		setupThemeSync(this.context, (data) => this.provider.postMessage(data));
+
+		// 10. Subscribe to serverController events
+		serverController.onConnectionLost = () => {
+			this.provider.showError(
+				"Connection to OpenCode server lost.",
+				true,
+			);
 		};
 
-		// (c) Register commands
-		this.registerCommands();
+		serverController.onConnectionRestored = () => {
+			try {
+				const sessionPath = new URL(
+					serverController.getSessionUrl(),
+				).pathname;
+				this.provider.navigateToSession(sessionPath);
+			} catch {
+				// Server not started yet — ignore
+			}
+		};
 
-		// (d) Subscribe to workspace folder changes
-		this.subscribeWorkspaceEvents();
+		serverController.onWorkspaceMismatch = () => {
+			this.logger.info(
+				"Workspace mismatch detected, re-resolving project root\u2026",
+			);
+			projectRoot = rootResolver.resolve();
+			serverController.updateProjectRoot(projectRoot);
+			void this._startServerFlow(serverController, projectRoot);
+		};
 
-		// (e) Push the DisposableStore to context.subscriptions
+		// Retry handler: user clicked the retry button on the error page
+		this.provider.onDidRequestRetry(() => {
+			this.logger.info("Retry requested by user");
+			void this._startServerFlow(serverController, projectRoot);
+		});
+
+		// 11. Subscribe workspace folder changes → re-resolve project root
+		this.disposables.add(
+			vscode.workspace.onDidChangeWorkspaceFolders((event) => {
+				this.logger.info(
+					`Workspace folders changed: added=${event.added.length}, removed=${event.removed.length}`,
+				);
+				projectRoot = rootResolver.resolve();
+				serverController.updateProjectRoot(projectRoot);
+			}),
+		);
+
+		// 12. Push the DisposableStore to context.subscriptions
 		//     VS Code will call dispose() on deactivation.
 		this.context.subscriptions.push(this.disposables);
 
-		// TODO (Wave 2): Initialize ServerController
-		// TODO (Wave 2): Start proxy server
-		// TODO (Wave 3): Register WebviewViewProvider for tool window
-		// TODO (Wave 4): Set up theme sync (onDidChangeActiveColorTheme)
+		// Kick off server startup (fire-and-forget — webview shows loading spinner)
+		void this._startServerFlow(serverController, projectRoot);
 
-		this.logger.info('OpenCode extension activated.');
+		this.logger.info("OpenCode extension activated.");
 	}
 
 	// -----------------------------------------------------------------------
@@ -92,63 +139,68 @@ export class ExtensionController {
 	 * explicitly dispose here for deterministic ordering.
 	 */
 	async deactivate(): Promise<void> {
-		this.logger.info('OpenCode extension deactivating…');
+		this.logger.info("OpenCode extension deactivating\u2026");
 
-		// TODO (Wave 2): Stop ServerController (kills opencode serve process)
-		// TODO (Wave 2): Stop proxy server
-		// TODO (Wave 2): Await ProcessRegistry cleanup (platform-aware kill)
+		const serverController = getServerController();
+		await serverController.stop();
 
+		if (this.proxyServer) {
+			await this.proxyServer.stop();
+		}
+
+		this.provider.dispose();
 		this.disposables.dispose();
 
-		this.logger.info('OpenCode extension deactivated.');
+		this.logger.info("OpenCode extension deactivated.");
 	}
 
 	// -----------------------------------------------------------------------
-	// Internal wiring
+	// Private helpers
 	// -----------------------------------------------------------------------
 
 	/**
-	 * Register all commands declared in `package.json` → `contributes.commands`.
+	 * Start (or restart) the full server → proxy → webview pipeline.
 	 *
-	 * For now only `vscode-opencode.openToolWindow` exists. Additional
-	 * commands (refresh, settings, etc.) will be added in Wave 3.
+	 * 1. Start the OpenCode server via {@link ServerController.start},
+	 *    which also handles session lookup/creation and starts the
+	 *    {@link ConnectionMonitor}.
+	 * 2. Create a {@link ProxyServer} pointed at the server's base URL
+	 *    and bind it to a local port.
+	 * 3. Navigate the webview to the session via the proxy.
+	 *
+	 * On failure the webview displays an error page with a retry button.
 	 */
-	private registerCommands(): void {
-		this.disposables.add(
-			vscode.commands.registerCommand(
-				'vscode-opencode.openToolWindow',
-				() => {
-					// TODO (Wave 3): Open the sidebar WebView — for now, a placeholder.
-					void vscode.window.showInformationMessage(
-						'OpenCode: Tool window coming soon',
-					);
-				},
-			),
-		);
+	private async _startServerFlow(
+		serverController: ServerController,
+		projectRoot: string,
+	): Promise<void> {
+		try {
+			const result = await serverController.start(projectRoot);
+			const sessionUrl = result.sessionUrl;
 
-		// TODO (Wave 3): vscode-opencode.refreshView
-		// TODO (Wave 3): vscode-opencode.showLogs
+			// Extract the upstream base URL (origin) from the session URL
+			const baseUrl = new URL(sessionUrl).origin;
 
-		this.logger.info('Commands registered.');
-	}
+			// Stop existing proxy if any (server may have moved ports)
+			if (this.proxyServer) {
+				await this.proxyServer.stop();
+			}
 
-	/**
-	 * Listen for workspace folder changes so we can re-resolve the
-	 * project root and restart the server if needed.
-	 */
-	private subscribeWorkspaceEvents(): void {
-		this.disposables.add(
-			vscode.workspace.onDidChangeWorkspaceFolders((event) => {
-				this.logger.info(
-					`Workspace folders changed: added=${event.added.length}, removed=${event.removed.length}`,
-				);
+			// Start proxy with the upstream server URL
+			this.proxyServer = new ProxyServer(baseUrl);
+			await this.proxyServer.start();
 
-				// TODO (Wave 2): When ProjectRootResolver is available,
-				//                re-resolve the project root and restart
-				//                the server flow if the root changed.
-			}),
-		);
-
-		this.logger.info('Workspace events subscribed.');
+			// Navigate webview to the session (e.g. /session/abc123)
+			const sessionPath = new URL(sessionUrl).pathname;
+			this.provider.navigateToSession(sessionPath);
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : String(err);
+			this.logger.error(`Failed to start server: ${message}`);
+			this.provider.showError(
+				`Failed to start OpenCode: ${message}`,
+				true,
+			);
+		}
 	}
 }
