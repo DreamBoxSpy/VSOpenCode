@@ -110,13 +110,12 @@ export class ServerController {
 			const serverInfo: ServerInfo =
 				await this._serverService.start(projectRoot);
 			this._baseUrl = serverInfo.baseUrl;
-		} else {
-			const { baseUrl } = this._serverService.getClient();
-			this._baseUrl = baseUrl;
 		}
 
-		// 3. Create / update SessionService with current base URL
-		this._sessionService = new SessionService(this._baseUrl);
+		// 3. Create / update SessionService with current base URL and SDK client
+		const { baseUrl, sdkClient } = this._serverService.getClient();
+		this._baseUrl = baseUrl;
+		this._sessionService = new SessionService(this._baseUrl, sdkClient);
 
 		// 4. Find existing session or create a new one
 		const normalizedRoot = normalizePath(projectRoot);

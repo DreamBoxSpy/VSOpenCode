@@ -91,5 +91,8 @@
     "esbuild": "*",
     "mocha": "^11.7.6",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.18.3"
   }
 }
